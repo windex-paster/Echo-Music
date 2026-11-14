@@ -1,5 +1,7 @@
 package com.music.echo.ui.component
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -64,7 +66,8 @@ fun AggregatorSwitcherBar(
     val (spotifySpDc) = rememberPreference(SpotifySpDcKey, defaultValue = "")
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(
+        val coroutineScope = rememberCoroutineScope()
+    Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -118,7 +121,7 @@ fun AggregatorSwitcherBar(
         ) {
             ProxyServiceSource.entries.forEach { source ->
                 val isSelected = activeSource == source
-                val serviceRouting = routingConfig.forSource(source)
+                val serviceRouting = when (source) { ProxyServiceSource.YOUTUBE_MUSIC -> routingConfig.youtubeMusic; ProxyServiceSource.SOUNDCLOUD -> routingConfig.soundCloud; ProxyServiceSource.SPOTIFY -> routingConfig.spotify }
                 val apiProfile = profiles.firstOrNull { it.id == serviceRouting.apiProfileId }
                 val contentProfile = profiles.firstOrNull { it.id == serviceRouting.contentProfileId }
 
@@ -145,7 +148,7 @@ fun AggregatorSwitcherBar(
                     apiProxyName = apiProfile?.name,
                     contentProxyName = contentProfile?.name,
                     onClick = {
-                        ProxyRouter.setActiveSource(context, source)
+                        coroutineScope.launch { ProxyRouter.setActiveSource(context, source) }
                         onSourceChanged?.invoke(source)
                     }
                 )
@@ -231,14 +234,14 @@ private fun AggregatorCard(
                     ) {
                         Icon(
                             painter = painterResource(iconRes),
-                            contentDescription = source.title,
+                            contentDescription = source.displayName,
                             tint = accentColor,
                             modifier = Modifier.size(18.dp)
                         )
                     }
 
                     Text(
-                        text = source.title,
+                        text = source.displayName,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
