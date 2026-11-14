@@ -3991,32 +3991,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   private fun createOkHttpFactory(): androidx.media3.datasource.DataSource.Factory {
-    return OkHttpDataSource.Factory(
-      OkHttpClient.Builder()
-        .connectionPool(okhttp3.ConnectionPool(15, 10, java.util.concurrent.TimeUnit.MINUTES))
-        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .dns(
-          object : Dns {
-            override fun lookup(hostname: String): List<InetAddress> {
-              val addresses = Dns.SYSTEM.lookup(hostname)
-              return when (this@MusicService.ipVersion) {
-                IpVersion.IPV4 -> addresses.filter { it is Inet4Address }.ifEmpty { addresses }
-                IpVersion.IPV6 -> addresses.filter { it is Inet6Address }.ifEmpty { addresses }
-                IpVersion.AUTO -> addresses
-              }
-            }
-          }
-        )
-        .proxy(YouTube.proxy)
-        .proxyAuthenticator { _, response ->
-          YouTube.proxyAuth?.let { auth ->
-            response.request.newBuilder().header("Proxy-Authorization", auth).build()
-          } ?: response.request
-        }
-        .build()
-    )
+    return com.music.echo.playback.ProxyRoutingDataSourceFactory { this@MusicService.ipVersion }
   }
 
   private var isSilenceSkipping = false
@@ -4330,6 +4305,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                   )
                 )
               }
+            } else if (com.music.echo.soundcloud.SoundCloud.isSoundCloudMediaId(mediaId)) {
+              val scResult = com.music.echo.soundcloud.SoundCloud.resolvePlaybackData(mediaId)
+              if (scResult.isSuccess) {
+                isAddonStream = true
+                return@runBlocking scResult
+              }
             }
 
             val dbSong = database.song(mediaId).firstOrNull()
@@ -4359,6 +4340,22 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             val knownDuration = dbSong?.song?.duration?.let { if (it > 0) it * 1000L else null }
                 ?: queueMeta?.duration?.takeIf { it > 0 }?.times(1000L)
                 ?: trackedDurationMs.takeIf { trackedMediaItem?.mediaId == mediaId && it > 0 }
+
+            if (com.music.echo.spotify.SpotifyCatalogBridge.isSpotifyMediaId(mediaId)) {
+              val spResult =
+                com.music.echo.spotify.SpotifyCatalogBridge.resolvePlaybackData(
+                  mediaId = mediaId,
+                  knownTitle = knownTitle,
+                  knownArtist = knownArtist,
+                  knownDurationMs = knownDuration,
+                  audioQuality = audioQuality,
+                  connectivityManager = connectivityManager
+                )
+              if (spResult.isSuccess) {
+                isAddonStream = true
+                return@runBlocking spResult
+              }
+            }
 
             val extStream =
               if (canUseAddon && hasEnabledAddons) {

@@ -89,6 +89,15 @@ object Spotify {
 
   private val restClient by lazy {
     HttpClient(OkHttp) {
+      engine {
+        config {
+          com.music.echo.proxy.ProxyRouter.configureOkHttpBuilder(
+            this,
+            com.music.echo.proxy.ProxyServiceSource.SPOTIFY,
+            com.music.echo.proxy.ProxyChannel.API
+          )
+        }
+      }
       install(ContentNegotiation) { json(json) }
       defaultRequest {
         url("https://api.spotify.com/v1/")
@@ -108,6 +117,11 @@ object Spotify {
           connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
           readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
           writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+          com.music.echo.proxy.ProxyRouter.configureOkHttpBuilder(
+            this,
+            com.music.echo.proxy.ProxyServiceSource.SPOTIFY,
+            com.music.echo.proxy.ProxyChannel.API
+          )
         }
       }
       defaultRequest {

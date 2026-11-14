@@ -159,6 +159,15 @@ object InnerTubeXResolver {
 
   private val http =
     HttpClient(OkHttp) {
+      engine {
+        config {
+          com.music.echo.proxy.ProxyRouter.configureOkHttpBuilder(
+            this,
+            com.music.echo.proxy.ProxyServiceSource.YOUTUBE_MUSIC,
+            com.music.echo.proxy.ProxyChannel.CONTENT
+          )
+        }
+      }
       install(ContentNegotiation) {
         json(
           Json {

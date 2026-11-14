@@ -47,11 +47,17 @@ object YTPlayerUtils {
 
   private val httpClient =
     OkHttpClient.Builder()
-      .proxy(YouTube.proxy)
       .connectTimeout(20, TimeUnit.SECONDS)
       .readTimeout(20, TimeUnit.SECONDS)
       .writeTimeout(20, TimeUnit.SECONDS)
       .retryOnConnectionFailure(true)
+      .apply {
+        com.music.echo.proxy.ProxyRouter.configureOkHttpBuilder(
+          this,
+          com.music.echo.proxy.ProxyServiceSource.YOUTUBE_MUSIC,
+          com.music.echo.proxy.ProxyChannel.CONTENT
+        )
+      }
       .build()
 
   private val poTokenGenerator = PoTokenGenerator()

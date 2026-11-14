@@ -147,6 +147,7 @@ class App : Application(), SingletonImageLoader.Factory, Configuration.Provider 
     }
 
     applicationScope.launch {
+      com.music.echo.proxy.ProxyRouter.initialize(this@App, applicationScope)
       initializeSettings()
 
       echo.music.iad1tya.utils.InnerTubeXResolver.init(this@App)
@@ -181,7 +182,7 @@ class App : Application(), SingletonImageLoader.Factory, Configuration.Provider 
       KuGou.useTraditionalChinese = true
     }
 
-    if (settings[ProxyEnabledKey] == true) {
+    if (settings[ProxyEnabledKey] == true && settings[com.music.echo.proxy.ProxyProfilesJsonKey].isNullOrBlank()) {
       val username = settings[ProxyUsernameKey].orEmpty()
       val password = settings[ProxyPasswordKey].orEmpty()
       val type = settings[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP)
@@ -208,6 +209,7 @@ class App : Application(), SingletonImageLoader.Factory, Configuration.Provider 
         reportException(e)
       }
     }
+    com.music.echo.proxy.ProxyRouter.syncInnerTubeProxy()
 
     YouTube.useLoginForBrowse = settings[UseLoginForBrowse] ?: true
     YouTube.ipVersion =
@@ -380,6 +382,11 @@ class App : Application(), SingletonImageLoader.Factory, Configuration.Provider 
         crossfade(true)
         allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
         components {
+          add(
+            coil3.network.okhttp.OkHttpNetworkFetcherFactory(
+              callFactory = { com.music.echo.proxy.ProxyRouter.getCoilOkHttpClient() }
+            )
+          )
           add(YouTubeThumbnailFallbackInterceptor())
           add(LocalAlbumArtFetcher.Factory())
         }

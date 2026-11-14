@@ -137,7 +137,15 @@ object PlayerConfigStore {
   // Built once on first use (mirrors PlayerJsFetcher's single client) so config refreshes
   // reuse one connection pool/dispatcher instead of allocating a fresh client per fetch.
   private val httpClient: OkHttpClient by lazy {
-    OkHttpClient.Builder().apply { YouTube.proxy?.let { proxy(it) } }.build()
+    OkHttpClient.Builder()
+      .apply {
+        com.music.echo.proxy.ProxyRouter.configureOkHttpBuilder(
+          this,
+          com.music.echo.proxy.ProxyServiceSource.YOUTUBE_MUSIC,
+          com.music.echo.proxy.ProxyChannel.CONTENT
+        )
+      }
+      .build()
   }
 
   /**

@@ -2,7 +2,6 @@
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-
     repositories {
         google()
         mavenCentral()
@@ -39,9 +38,10 @@ include(
     ":metadata",
     ":dsp-core",
     ":audio-dsp",
-    ":domain"
+    ":domain",
+    ":soundcloud",
+    ":spotify"
 )
-
 
 // Use a local copy of BravePipe Extractor.
 // We assume, that echomusic and BravePipe Extractor have the same parent directory.
@@ -53,6 +53,7 @@ include(
 //      implementation(libs.newpipe.extractor)
 // To:
 //      implementation("com.github.bravepipeproject:extractor")
+
 // includeBuild("../BravePipeExtractor") {
 //     dependencySubstitution {
 //         substitute(module("com.github.bravepipeproject:extractor")).using(project(":extractor"))

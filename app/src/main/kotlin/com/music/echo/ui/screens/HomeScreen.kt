@@ -951,11 +951,148 @@ fun HomeScreen(
         if (isPodcastPage) podcastsViewModel.loadNewEpisodes()
       }
 
+      val activeAggregatorSource by com.music.echo.proxy.ProxyRouter.activeSource.collectAsState()
+      val (spotifySpDcHome) = rememberPreference(echo.music.iad1tya.constants.SpotifySpDcKey, defaultValue = "")
+      val (spotifySpKeyHome) = rememberPreference(echo.music.iad1tya.constants.SpotifySpKeyKey, defaultValue = "")
+      var soundCloudTrendingSongs by remember { mutableStateOf<List<SongItem>>(emptyList()) }
+      var spotifyDiscoverySongs by remember { mutableStateOf<List<SongItem>>(emptyList()) }
+      LaunchedEffect(activeAggregatorSource, spotifySpDcHome) {
+        when (activeAggregatorSource) {
+          com.music.echo.proxy.ProxyServiceSource.SOUNDCLOUD -> {
+            if (soundCloudTrendingSongs.isEmpty()) {
+              com.music.echo.soundcloud.SoundCloud.getTrendingFeed(limit = 16).onSuccess {
+                soundCloudTrendingSongs = it
+              }
+            }
+          }
+          com.music.echo.proxy.ProxyServiceSource.SPOTIFY -> {
+            if (spotifyDiscoverySongs.isEmpty()) {
+              com.music.echo.spotify.SpotifyCatalogBridge.getDiscoveryFeed(
+                spDc = spotifySpDcHome,
+                spKey = spotifySpKeyHome,
+                limit = 16
+              ).onSuccess {
+                spotifyDiscoverySongs = it
+              }
+            }
+          }
+          com.music.echo.proxy.ProxyServiceSource.YOUTUBE_MUSIC -> {}
+        }
+      }
+
       LazyColumn(
         state = lazylistState,
         modifier = Modifier.hapticScrollEdge(lazylistState),
         contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues()
       ) {
+        item(key = "aggregator_switcher_bar") {
+          com.music.echo.ui.component.AggregatorSwitcherBar(
+            onOpenProxySettings = { navController.navigate("settings/proxy") }
+          )
+        }
+
+        if (activeAggregatorSource == com.music.echo.proxy.ProxyServiceSource.SOUNDCLOUD && soundCloudTrendingSongs.isNotEmpty()) {
+          item(key = "soundcloud_trending_title") {
+            NavigationTitle(
+              title = "SoundCloud • В тренде",
+              label = "t500x500 • Progressive MP3 / HLS"
+            )
+          }
+          item(key = "soundcloud_trending_row") {
+            LazyRow(
+              contentPadding = PaddingValues(horizontal = 16.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+              items(soundCloudTrendingSongs, key = { it.id }) { scSong ->
+                YouTubeGridItem(
+                  item = scSong,
+                  isActive = mediaMetadata?.id == scSong.id,
+                  isPlaying = isPlaying,
+                  coroutineScope = scope,
+                  thumbnailRatio = 1f,
+                  forceCrop = true,
+                  modifier = Modifier.combinedClickable(
+                    onClick = {
+                      if (mediaMetadata?.id == scSong.id) {
+                        playerConnection.togglePlayPause()
+                      } else {
+                        playerConnection.playQueue(
+                          ListQueue(
+                            title = "SoundCloud • В тренде",
+                            items = soundCloudTrendingSongs.map { it.toMediaItem() },
+                            startIndex = soundCloudTrendingSongs.indexOfFirst { it.id == scSong.id }.coerceAtLeast(0)
+                          )
+                        )
+                      }
+                    },
+                    onLongClick = {
+                      haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                      menuState.show {
+                        YouTubeSongMenu(
+                          song = scSong,
+                          navController = navController,
+                          onDismiss = menuState::dismiss
+                        )
+                      }
+                    }
+                  )
+                )
+              }
+            }
+          }
+        }
+
+        if (activeAggregatorSource == com.music.echo.proxy.ProxyServiceSource.SPOTIFY && spotifyDiscoverySongs.isNotEmpty()) {
+          item(key = "spotify_discovery_title") {
+            NavigationTitle(
+              title = "Spotify • Рекомендации и Топ",
+              label = "API-прокси + DRM-мост (YT Music / SoundCloud)"
+            )
+          }
+          item(key = "spotify_discovery_row") {
+            LazyRow(
+              contentPadding = PaddingValues(horizontal = 16.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+              items(spotifyDiscoverySongs, key = { it.id }) { spSong ->
+                YouTubeGridItem(
+                  item = spSong,
+                  isActive = mediaMetadata?.id == spSong.id,
+                  isPlaying = isPlaying,
+                  coroutineScope = scope,
+                  thumbnailRatio = 1f,
+                  forceCrop = true,
+                  modifier = Modifier.combinedClickable(
+                    onClick = {
+                      if (mediaMetadata?.id == spSong.id) {
+                        playerConnection.togglePlayPause()
+                      } else {
+                        playerConnection.playQueue(
+                          ListQueue(
+                            title = "Spotify • Рекомендации",
+                            items = spotifyDiscoverySongs.map { it.toMediaItem() },
+                            startIndex = spotifyDiscoverySongs.indexOfFirst { it.id == spSong.id }.coerceAtLeast(0)
+                          )
+                        )
+                      }
+                    },
+                    onLongClick = {
+                      haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                      menuState.show {
+                        YouTubeSongMenu(
+                          song = spSong,
+                          navController = navController,
+                          onDismiss = menuState::dismiss
+                        )
+                      }
+                    }
+                  )
+                )
+              }
+            }
+          }
+        }
+
         item {
           ChipsRow(
             chips =

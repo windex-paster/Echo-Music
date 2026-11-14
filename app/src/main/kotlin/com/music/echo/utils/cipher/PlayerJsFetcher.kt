@@ -21,7 +21,16 @@ object PlayerJsFetcher {
     "https://www.youtube.com/s/player/%s/player_ias.vflset/en_GB/base.js"
   private const val CACHE_TTL_MS = 6 * 60 * 60 * 1000L // 6 hours
 
-  private val httpClient = OkHttpClient.Builder().proxy(YouTube.proxy).build()
+  private val httpClient =
+    OkHttpClient.Builder()
+      .apply {
+        com.music.echo.proxy.ProxyRouter.configureOkHttpBuilder(
+          this,
+          com.music.echo.proxy.ProxyServiceSource.YOUTUBE_MUSIC,
+          com.music.echo.proxy.ProxyChannel.CONTENT
+        )
+      }
+      .build()
 
   // Regex to extract player hash from iframe_api response
   private val PLAYER_HASH_REGEX = Regex("""\\?/s\\?/player\\?/([a-zA-Z0-9_-]+)\\?/""")

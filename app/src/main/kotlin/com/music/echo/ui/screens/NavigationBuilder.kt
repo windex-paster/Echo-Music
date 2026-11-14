@@ -473,6 +473,13 @@ fun NavGraphBuilder.navigationBuilder(
     )
   }
 
+  composable("settings/proxy") {
+    echo.music.iad1tya.ui.screens.settings.ProxySettingsScreen(
+      navController = navController,
+      scrollBehavior = scrollBehavior
+    )
+  }
+
   composable("uptime") { UptimeScreen(navController, scrollBehavior) }
 
   composable(

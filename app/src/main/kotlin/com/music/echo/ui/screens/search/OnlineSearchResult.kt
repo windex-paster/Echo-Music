@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -43,8 +44,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -59,6 +58,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.music.echo.proxy.ProxyRouter
+import com.music.echo.proxy.ProxyServiceSource
+import com.music.echo.soundcloud.SoundCloud
+import com.music.echo.spotify.SpotifyCatalogBridge
+import com.music.echo.ui.component.AggregatorSwitcherBar
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_ALBUM
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_ARTIST
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_COMMUNITY_PLAYLIST
@@ -81,7 +85,9 @@ import echo.music.iad1tya.constants.MiniPlayerHeight
 import echo.music.iad1tya.constants.NavigationBarHeight
 import echo.music.iad1tya.constants.PauseSearchHistoryKey
 import echo.music.iad1tya.db.entities.SearchHistory
+import echo.music.iad1tya.extensions.toMediaItem
 import echo.music.iad1tya.models.toMediaMetadata
+import echo.music.iad1tya.playback.queues.ListQueue
 import echo.music.iad1tya.playback.queues.YouTubeQueue
 import echo.music.iad1tya.ui.component.ChipsRow
 import echo.music.iad1tya.ui.component.EmptyPlaceholder
@@ -116,6 +122,7 @@ fun OnlineSearchResult(
   val haptic = LocalHapticFeedback.current
   val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
   val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+  val activeSource by ProxyRouter.activeSource.collectAsState()
 
   val coroutineScope = rememberCoroutineScope()
   val lazyListState = rememberLazyListState()
@@ -181,7 +188,7 @@ fun OnlineSearchResult(
   val searchFilter by viewModel.filter.collectAsState()
   val searchSummary = viewModel.summaryPage
   val itemsPage by
-    remember(searchFilter) {
+    remember(searchFilter, activeSource) {
       derivedStateOf { searchFilter?.value?.let { viewModel.viewStateMap[it] } }
     }
 
@@ -252,15 +259,47 @@ fun OnlineSearchResult(
                   is SongItem -> {
                     if (item.id == mediaMetadata?.id) {
                       playerConnection.togglePlayPause()
+                    } else if (SoundCloud.isSoundCloudMediaId(item.id)) {
+                      playerConnection.playQueue(
+                        ListQueue(
+                          title = "SoundCloud • ${item.title}",
+                          items = listOf(item.toMediaItem())
+                        )
+                      )
+                    } else if (SpotifyCatalogBridge.isSpotifyMediaId(item.id)) {
+                      playerConnection.playQueue(
+                        ListQueue(
+                          title = "Spotify • ${item.title}",
+                          items = listOf(item.toMediaItem())
+                        )
+                      )
                     } else {
                       playerConnection.playQueue(
                         YouTubeQueue(WatchEndpoint(videoId = item.id), item.toMediaMetadata())
                       )
                     }
                   }
-                  is AlbumItem -> navController.navigate("album/${item.id}")
-                  is ArtistItem -> navController.navigate("artist/${item.id}")
-                  is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                  is AlbumItem -> {
+                    if (item.id.startsWith("sc_") || item.id.startsWith("sp_")) {
+                      onSearch(item.title)
+                    } else {
+                      navController.navigate("album/${item.id}")
+                    }
+                  }
+                  is ArtistItem -> {
+                    if (item.id.startsWith("sc_") || item.id.startsWith("sp_")) {
+                      onSearch(item.title)
+                    } else {
+                      navController.navigate("artist/${item.id}")
+                    }
+                  }
+                  is PlaylistItem -> {
+                    if (item.id.startsWith("sc_") || item.id.startsWith("sp_")) {
+                      onSearch(item.title)
+                    } else {
+                      navController.navigate("online_playlist/${item.id}")
+                    }
+                  }
                 }
               },
               onLongClick = longClick,
@@ -280,7 +319,11 @@ fun OnlineSearchResult(
       onValueChange = { newQuery -> query = newQuery },
       placeholder = {
         Text(
-          text = stringResource(R.string.search_yt_music),
+          text = when (activeSource) {
+            ProxyServiceSource.SOUNDCLOUD -> "Поиск в SoundCloud..."
+            ProxyServiceSource.SPOTIFY -> "Поиск в Spotify..."
+            ProxyServiceSource.YOUTUBE_MUSIC -> stringResource(R.string.search_yt_music)
+          },
           style = MaterialTheme.typography.bodyLarge,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -330,21 +373,36 @@ fun OnlineSearchResult(
           }
     )
 
+    AggregatorSwitcherBar(
+      contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+      onOpenProxySettings = { navController.navigate("settings/proxy") }
+    )
+
     Box(modifier = Modifier.weight(1f)) {
       Column(modifier = Modifier.fillMaxWidth()) {
         ChipsRow(
           chips =
-            listOf(
-              null to stringResource(R.string.filter_all),
-              FILTER_SONG to stringResource(R.string.filter_songs),
-              FILTER_VIDEO to stringResource(R.string.filter_videos),
-              FILTER_ALBUM to stringResource(R.string.filter_albums),
-              FILTER_ARTIST to stringResource(R.string.filter_artists),
-              FILTER_COMMUNITY_PLAYLIST to stringResource(R.string.filter_community_playlists),
-              FILTER_FEATURED_PLAYLIST to stringResource(R.string.filter_featured_playlists),
-              FILTER_PODCAST to stringResource(R.string.filter_podcasts),
-              FILTER_EPISODE to stringResource(R.string.filter_episodes),
-            ),
+            if (activeSource == ProxyServiceSource.SOUNDCLOUD || activeSource == ProxyServiceSource.SPOTIFY) {
+              listOf(
+                null to stringResource(R.string.filter_all),
+                FILTER_SONG to stringResource(R.string.filter_songs),
+                FILTER_ALBUM to stringResource(R.string.filter_albums),
+                FILTER_ARTIST to stringResource(R.string.filter_artists),
+                FILTER_COMMUNITY_PLAYLIST to stringResource(R.string.filter_community_playlists),
+              )
+            } else {
+              listOf(
+                null to stringResource(R.string.filter_all),
+                FILTER_SONG to stringResource(R.string.filter_songs),
+                FILTER_VIDEO to stringResource(R.string.filter_videos),
+                FILTER_ALBUM to stringResource(R.string.filter_albums),
+                FILTER_ARTIST to stringResource(R.string.filter_artists),
+                FILTER_COMMUNITY_PLAYLIST to stringResource(R.string.filter_community_playlists),
+                FILTER_FEATURED_PLAYLIST to stringResource(R.string.filter_featured_playlists),
+                FILTER_PODCAST to stringResource(R.string.filter_podcasts),
+                FILTER_EPISODE to stringResource(R.string.filter_episodes),
+              )
+            },
           currentValue = searchFilter,
           onValueUpdate = {
             if (viewModel.filter.value != it) {

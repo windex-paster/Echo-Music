@@ -91,7 +91,11 @@ object PlayerDatesStore {
   private fun fetchRemote(): String {
     val url = URL(REMOTE_URL)
     val conn =
-      (YouTube.proxy?.let { url.openConnection(it) } ?: url.openConnection()) as HttpURLConnection
+      com.music.echo.proxy.ProxyRouter.openConnection(
+        url,
+        com.music.echo.proxy.ProxyServiceSource.YOUTUBE_MUSIC,
+        com.music.echo.proxy.ProxyChannel.CONTENT
+      )
     return try {
       conn.run {
         connectTimeout = 10_000

@@ -94,6 +94,32 @@ object SpotifyAuth {
     token
   }
 
+  /**
+   * Получает публичный (anonymous) токен веб-плеера Spotify с использованием TOTP через API-прокси
+   * Spotify, чтобы поиск и каталог работали даже до ввода cookie sp_dc.
+   */
+  suspend fun fetchAnonymousAccessToken(): Result<SpotifyInternalToken> = runCatching {
+    val nuance = fetchNuance()
+    val serverTimeSec = fetchServerTime()
+    val totp = generateTotp(nuance.s, serverTimeSec)
+
+    val tokenUrl = buildString {
+      append(TOKEN_URL)
+      append("?reason=transport")
+      append("&productType=web-player")
+      append("&totp=$totp")
+      append("&totpServer=$totp")
+      append("&totpVer=${nuance.v}")
+    }
+
+    val body = withContext(Dispatchers.IO) { httpGet(tokenUrl, emptyMap()) }
+    val token = json.decodeFromString<SpotifyInternalToken>(body)
+    if (token.accessToken.isBlank()) {
+      throw Spotify.SpotifyException(401, "Empty accessToken from Spotify web-player endpoint")
+    }
+    token
+  }
+
   private suspend fun fetchNuance(): Nuance =
     withContext(Dispatchers.IO) {
       val body =
@@ -181,7 +207,12 @@ object SpotifyAuth {
   }
 
   private fun httpGet(urlString: String, extraHeaders: Map<String, String>): String {
-    val connection = URL(urlString).openConnection() as HttpURLConnection
+    val connection =
+      com.music.echo.proxy.ProxyRouter.openConnection(
+        URL(urlString),
+        com.music.echo.proxy.ProxyServiceSource.SPOTIFY,
+        com.music.echo.proxy.ProxyChannel.API
+      )
     try {
       connection.requestMethod = "GET"
       connection.instanceFollowRedirects = true

@@ -942,11 +942,26 @@ fun ContentSettings(
 
     Spacer(modifier = Modifier.height(16.dp))
 
+    val proxyProfiles by com.music.echo.proxy.ProxyRouter.profiles.collectAsState()
+
     Material3SettingsGroup(
       scrollState = scrollState,
       title = stringResource(R.string.proxy),
       items =
         buildList {
+          add(
+            Material3SettingsItem(
+              isHighlighted = (highlightKey == "Менеджер прокси и маршрутизация"),
+              icon = painterResource(R.drawable.wifi_proxy),
+              title = { Text("Менеджер прокси и маршрутизация") },
+              description = {
+                Text(
+                  "Профилей: ${proxyProfiles.size} • Раздельный прокси (API и контент) для YouTube Music, SoundCloud и Spotify"
+                )
+              },
+              onClick = { navController.navigate("settings/proxy") }
+            )
+          )
           add(
             Material3SettingsItem(
               isHighlighted = (highlightKey == stringResource(R.string.network_ip_version)),

@@ -341,7 +341,16 @@ private constructor(
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.3"
     private const val JS_INTERFACE = "PoTokenWebView"
 
-    private val httpClient = OkHttpClient.Builder().proxy(YouTube.proxy).build()
+    private val httpClient =
+      OkHttpClient.Builder()
+        .apply {
+          com.music.echo.proxy.ProxyRouter.configureOkHttpBuilder(
+            this,
+            com.music.echo.proxy.ProxyServiceSource.YOUTUBE_MUSIC,
+            com.music.echo.proxy.ProxyChannel.CONTENT
+          )
+        }
+        .build()
 
     suspend fun getNewPoTokenGenerator(context: Context): PoTokenWebView {
       return withContext(Dispatchers.Main) {

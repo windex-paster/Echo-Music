@@ -127,8 +127,14 @@ fun SettingsScreen(
           unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
           disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
         ),
-      modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 16.dp)
+      modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 12.dp)
     )
+
+    com.music.echo.ui.component.AggregatorSwitcherBar(
+      contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+      onOpenProxySettings = { navController.navigate("settings/proxy") }
+    )
+    Spacer(Modifier.height(8.dp))
 
     val itemsList = buildList {
       if (
@@ -262,6 +268,25 @@ fun SettingsScreen(
             title = { Text(contentText) },
             description = { Text(contentDesc) },
             onClick = { navController.navigate("settings/content") }
+          )
+        )
+      }
+
+      if (
+        "прокси".contains(searchLower) ||
+          "proxy".contains(searchLower) ||
+          "socks5".contains(searchLower) ||
+          "маршрутизация".contains(searchLower)
+      ) {
+        add(
+          Material3SettingsItem(
+            isHighlighted = (highlightKey == "proxy"),
+            icon = painterResource(R.drawable.wifi_proxy),
+            title = { Text("Прокси и маршрутизация") },
+            description = {
+              Text("SOCKS5 / HTTP профили и раздельная маршрутизация API и контента")
+            },
+            onClick = { navController.navigate("settings/proxy") }
           )
         )
       }
@@ -441,8 +466,8 @@ fun SettingsScreen(
       val accountGroup = itemsList.take(2) // Account, AI
       val listeningSummaryGroup = itemsList.drop(2).take(1) // Listening Summary
       val playerGroup = itemsList.drop(3).take(4) // Appearance, Player, Music Flow, Listen Together
-      val dataGroup = itemsList.drop(7).take(4) // Content, Privacy, Storage, Backup
-      val systemGroup = itemsList.drop(11) // Update, Links, About
+      val dataGroup = itemsList.drop(7).take(5) // Content, Proxy, Privacy, Storage, Backup
+      val systemGroup = itemsList.drop(12) // Update, Links, About
 
       if (accountGroup.isNotEmpty()) {
         Material3SettingsGroup(scrollState = scrollState, items = accountGroup)

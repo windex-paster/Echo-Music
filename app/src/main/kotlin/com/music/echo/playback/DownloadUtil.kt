@@ -96,30 +96,7 @@ constructor(
         CacheDataSource.Factory()
           .setCache(playerCache)
           .setUpstreamDataSourceFactory(
-            OkHttpDataSource.Factory(
-              OkHttpClient.Builder()
-                .dns(
-                  object : Dns {
-                    override fun lookup(hostname: String): List<InetAddress> {
-                      val addresses = Dns.SYSTEM.lookup(hostname)
-                      return when (this@DownloadUtil.ipVersion) {
-                        IpVersion.IPV4 ->
-                          addresses.filter { it is Inet4Address }.ifEmpty { addresses }
-                        IpVersion.IPV6 ->
-                          addresses.filter { it is Inet6Address }.ifEmpty { addresses }
-                        IpVersion.AUTO -> addresses
-                      }
-                    }
-                  }
-                )
-                .proxy(YouTube.proxy)
-                .proxyAuthenticator { _, response ->
-                  YouTube.proxyAuth?.let { auth ->
-                    response.request.newBuilder().header("Proxy-Authorization", auth).build()
-                  } ?: response.request
-                }
-                .build(),
-            )
+            com.music.echo.playback.ProxyRoutingDataSourceFactory { this@DownloadUtil.ipVersion }
           )
           .setCacheWriteDataSinkFactory(null)
           .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
@@ -146,11 +123,29 @@ constructor(
 
       val playbackData =
         runBlocking(Dispatchers.IO) {
-            YTPlayerUtils.playerResponseForPlayback(
-              videoId = mediaId,
-              audioQuality = AudioQuality.AUTO,
-              connectivityManager = connectivityManager
-            )
+            when {
+              com.music.echo.soundcloud.SoundCloud.isSoundCloudMediaId(mediaId) -> {
+                com.music.echo.soundcloud.SoundCloud.resolvePlaybackData(mediaId)
+              }
+              com.music.echo.spotify.SpotifyCatalogBridge.isSpotifyMediaId(mediaId) -> {
+                val existingInfo = database.getSongByIdBlocking(mediaId)
+                com.music.echo.spotify.SpotifyCatalogBridge.resolvePlaybackData(
+                  mediaId = mediaId,
+                  knownTitle = existingInfo?.title,
+                  knownArtist = existingInfo?.artists?.joinToString(", ") { it.name },
+                  knownDurationMs = existingInfo?.song?.duration?.takeIf { it > 0 }?.times(1000L),
+                  audioQuality = AudioQuality.AUTO,
+                  connectivityManager = connectivityManager
+                )
+              }
+              else -> {
+                YTPlayerUtils.playerResponseForPlayback(
+                  videoId = mediaId,
+                  audioQuality = AudioQuality.AUTO,
+                  connectivityManager = connectivityManager
+                )
+              }
+            }
           }
           .getOrThrow()
       val format = playbackData.format

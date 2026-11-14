@@ -333,6 +333,12 @@ dependencies {
   implementation(project(":echomusiccanvas"))
   implementation(project(":paxsenixlyrics"))
   implementation(project(":unison"))
+  if (rootProject.findProject(":soundcloud") != null) {
+    implementation(project(":soundcloud"))
+  }
+  if (rootProject.findProject(":spotify") != null) {
+    implementation(project(":spotify"))
+  }
 
   implementation(libs.ktor.client.core)
   implementation(libs.retrofit)
